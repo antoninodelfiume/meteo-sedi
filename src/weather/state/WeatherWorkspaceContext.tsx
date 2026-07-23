@@ -3,9 +3,9 @@ import {
   useContext,
   useState,
   type PropsWithChildren,
-} from 'react';
-import { officeSites } from '../sites';
-import type { OfficeSite, TemperatureUnit } from '../weather.types';
+} from "react";
+import { officeSites } from "../sites";
+import type { OfficeSite, TemperatureUnit } from "../weather.types";
 
 type WeatherWorkspaceValue = {
   selectedSiteId: string;
@@ -20,12 +20,22 @@ const WeatherWorkspaceContext = createContext<
 >(undefined);
 
 export function WeatherWorkspaceProvider({ children }: PropsWithChildren) {
-  const [selectedSiteId] = useState(officeSites[0].id);
-  const [temperatureUnit] = useState<TemperatureUnit>('celsius');
+  const [selectedSiteId, setSelectedSiteId] = useState(officeSites[0].id);
+  const [temperatureUnit, setTemperatureUnitState] =
+    useState<TemperatureUnit>("celsius");
 
   const selectedSite =
     officeSites.find((site) => site.id === selectedSiteId) ?? officeSites[0];
 
+  function selectSite(siteId: string) {
+    if (officeSites.some((site) => site.id === siteId)) {
+      setSelectedSiteId(siteId);
+    }
+  }
+
+  function setTemperatureUnit(unit: TemperatureUnit) {
+    setTemperatureUnitState(unit);
+  }
   return (
     <WeatherWorkspaceContext.Provider
       value={{
@@ -46,7 +56,7 @@ export function useWeatherWorkspace() {
 
   if (!value) {
     throw new Error(
-      'useWeatherWorkspace deve essere usato dentro WeatherWorkspaceProvider',
+      "useWeatherWorkspace deve essere usato dentro WeatherWorkspaceProvider",
     );
   }
 
