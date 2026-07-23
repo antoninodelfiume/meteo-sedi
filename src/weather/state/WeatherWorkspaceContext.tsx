@@ -42,8 +42,8 @@ export function WeatherWorkspaceProvider({ children }: PropsWithChildren) {
         selectedSiteId,
         selectedSite,
         temperatureUnit,
-        selectSite: () => undefined,
-        setTemperatureUnit: () => undefined,
+        selectSite,
+        setTemperatureUnit,
       }}
     >
       {children}
