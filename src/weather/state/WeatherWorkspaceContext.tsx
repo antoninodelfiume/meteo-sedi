@@ -1,11 +1,23 @@
+/* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
+  type ReactNode,
   useContext,
+  useEffect,
   useState,
-  type PropsWithChildren,
-} from "react";
-import { officeSites } from "../sites";
-import type { OfficeSite, TemperatureUnit } from "../weather.types";
+} from 'react';
+import { officeSites } from '../sites';
+import type { OfficeSite, TemperatureUnit } from '../weather.types';
+
+export const preferencesStorageKey =
+  'react-aziendale:meteo-sedi:preferences:v1';
+
+type StoredPreferences = {
+  selectedSiteId: string;
+  temperatureUnit: TemperatureUnit;
+};
+
+type PreferencesStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
 type WeatherWorkspaceValue = {
   selectedSiteId: string;
@@ -15,50 +27,123 @@ type WeatherWorkspaceValue = {
   setTemperatureUnit: (unit: TemperatureUnit) => void;
 };
 
-const WeatherWorkspaceContext = createContext<
-  WeatherWorkspaceValue | undefined
->(undefined);
+const defaultPreferences: StoredPreferences = {
+  selectedSiteId: officeSites[0].id,
+  temperatureUnit: 'celsius',
+};
 
-export function WeatherWorkspaceProvider({ children }: PropsWithChildren) {
-  const [selectedSiteId, setSelectedSiteId] = useState(officeSites[0].id);
+function isTemperatureUnit(value: unknown): value is TemperatureUnit {
+  return value === 'celsius' || value === 'fahrenheit';
+}
+
+function isKnownSiteId(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    officeSites.some((site) => site.id === value)
+  );
+}
+
+function getBrowserStorage(): PreferencesStorage | undefined {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+export function readPreferences(
+  storage: PreferencesStorage | undefined = getBrowserStorage(),
+): StoredPreferences {
+  if (!storage) return defaultPreferences;
+
+  try {
+    const rawValue = storage.getItem(preferencesStorageKey);
+    if (!rawValue) return defaultPreferences;
+
+    const parsed: unknown = JSON.parse(rawValue);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return defaultPreferences;
+    }
+
+    const selectedSiteId =
+      'selectedSiteId' in parsed ? parsed.selectedSiteId : null;
+    const temperatureUnit =
+      'temperatureUnit' in parsed ? parsed.temperatureUnit : null;
+
+    return {
+      selectedSiteId: isKnownSiteId(selectedSiteId)
+        ? selectedSiteId
+        : defaultPreferences.selectedSiteId,
+      temperatureUnit: isTemperatureUnit(temperatureUnit)
+        ? temperatureUnit
+        : defaultPreferences.temperatureUnit,
+    };
+  } catch {
+    return defaultPreferences;
+  }
+}
+
+const WeatherWorkspaceContext = createContext<WeatherWorkspaceValue | null>(
+  null,
+);
+
+export function WeatherWorkspaceProvider({
+  children,
+  storage = getBrowserStorage(),
+}: {
+  children: ReactNode;
+  storage?: PreferencesStorage;
+}) {
+  const [initialPreferences] = useState(() => readPreferences(storage));
+  const [selectedSiteId, setSelectedSiteId] = useState(
+    initialPreferences.selectedSiteId,
+  );
   const [temperatureUnit, setTemperatureUnitState] =
-    useState<TemperatureUnit>("celsius");
+    useState<TemperatureUnit>(initialPreferences.temperatureUnit);
 
   const selectedSite =
-    officeSites.find((site) => site.id === selectedSiteId) ?? officeSites[0];
+    officeSites.find((site) => site.id === selectedSiteId) ??
+    officeSites[0];
+
+  useEffect(() => {
+    if (!storage) return;
+    try {
+      storage.setItem(
+        preferencesStorageKey,
+        JSON.stringify({ selectedSiteId, temperatureUnit }),
+      );
+    } catch {
+      // L'app resta utilizzabile se il browser blocca o esaurisce lo storage.
+    }
+  }, [selectedSiteId, storage, temperatureUnit]);
 
   function selectSite(siteId: string) {
-    if (officeSites.some((site) => site.id === siteId)) {
-      setSelectedSiteId(siteId);
-    }
+    if (isKnownSiteId(siteId)) setSelectedSiteId(siteId);
   }
 
   function setTemperatureUnit(unit: TemperatureUnit) {
     setTemperatureUnitState(unit);
   }
+
+  const value: WeatherWorkspaceValue = {
+    selectedSiteId,
+    selectedSite,
+    temperatureUnit,
+    selectSite,
+    setTemperatureUnit,
+  };
+
   return (
-    <WeatherWorkspaceContext.Provider
-      value={{
-        selectedSiteId,
-        selectedSite,
-        temperatureUnit,
-        selectSite,
-        setTemperatureUnit,
-      }}
-    >
+    <WeatherWorkspaceContext.Provider value={value}>
       {children}
     </WeatherWorkspaceContext.Provider>
   );
 }
 
 export function useWeatherWorkspace() {
-  const value = useContext(WeatherWorkspaceContext);
-
-  if (!value) {
-    throw new Error(
-      "useWeatherWorkspace deve essere usato dentro WeatherWorkspaceProvider",
-    );
+  const context = useContext(WeatherWorkspaceContext);
+  if (!context) {
+    throw new Error('useWeatherWorkspace richiede WeatherWorkspaceProvider.');
   }
-
-  return value;
+  return context;
 }
