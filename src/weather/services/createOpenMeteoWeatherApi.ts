@@ -1,22 +1,45 @@
+import type { Forecast, OfficeSite, TemperatureUnit } from '../weather.types';
 import type { WeatherApi } from './WeatherApi';
 
-/**
- * L'adapter mantiene la firma finale ma non esegue richieste nello starter.
- * Il brief guida la costruzione dell'URL, fetch e mapping del payload.
- */
+const forecastEndpoint = 'https://api.open-meteo.com/v1/forecast';
+
+export function buildForecastUrl(
+  site: OfficeSite,
+  unit: TemperatureUnit,
+) {
+  const searchParams = new URLSearchParams({
+    latitude: String(site.latitude),
+    longitude: String(site.longitude),
+    current:
+      'temperature_2m,apparent_temperature,weather_code,wind_speed_10m',
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min',
+    temperature_unit: unit,
+    wind_speed_unit: 'kmh',
+    timezone: 'auto',
+    forecast_days: '5',
+  });
+  return `${forecastEndpoint}?${searchParams.toString()}`;
+}
+
+export function mapOpenMeteoForecast(_payload: unknown): Forecast {
+  throw new Error('Completa il mapping Open-Meteo nel TODO 07.');
+}
+
 export function createOpenMeteoWeatherApi(
   fetchImpl: typeof fetch = globalThis.fetch,
 ): WeatherApi {
   return {
     async getForecast(site, unit, signal) {
-      // TODO 5: costruire l'URL Open-Meteo dai parametri ricevuti.
-      // TODO 6: chiamare fetchImpl, verificare response.ok e inoltrare signal.
-      // TODO 7: validare e trasformare il payload nel tipo Forecast.
-      void fetchImpl;
-      void site;
-      void unit;
-      void signal;
-      throw new Error('API meteo non ancora implementata.');
+      const response = await fetchImpl(buildForecastUrl(site, unit), {
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Richiesta meteo non riuscita (${response.status}).`);
+      }
+
+      const payload: unknown = await response.json();
+      return mapOpenMeteoForecast(payload);
     },
   };
 }
