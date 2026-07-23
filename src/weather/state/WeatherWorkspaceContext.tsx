@@ -1,5 +1,9 @@
-/* eslint-disable react-refresh/only-export-components */
-import { createContext, type ReactNode, useContext } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  type PropsWithChildren,
+} from 'react';
 import { officeSites } from '../sites';
 import type { OfficeSite, TemperatureUnit } from '../weather.types';
 
@@ -11,37 +15,40 @@ type WeatherWorkspaceValue = {
   setTemperatureUnit: (unit: TemperatureUnit) => void;
 };
 
-const WeatherWorkspaceContext = createContext<WeatherWorkspaceValue | null>(null);
+const WeatherWorkspaceContext = createContext<
+  WeatherWorkspaceValue | undefined
+>(undefined);
 
-/**
- * Lo starter espone il contratto del Context con valori iniziali sicuri.
- * I TODO del brief aggiungono stato, azioni e persistenza.
- */
-export function WeatherWorkspaceProvider({ children }: { children: ReactNode }) {
-  // TODO 2: creare lo stato condiviso e fornire un valore tipizzato.
-  // TODO 3: implementare selectSite e setTemperatureUnit.
-  // TODO 4: leggere e persistere preferenze valide in localStorage.
-  const selectedSite = officeSites[0];
-  const value: WeatherWorkspaceValue = {
-    selectedSiteId: selectedSite.id,
-    selectedSite,
-    temperatureUnit: 'celsius',
-    selectSite: () => undefined,
-    setTemperatureUnit: () => undefined,
-  };
+export function WeatherWorkspaceProvider({ children }: PropsWithChildren) {
+  const [selectedSiteId] = useState(officeSites[0].id);
+  const [temperatureUnit] = useState<TemperatureUnit>('celsius');
+
+  const selectedSite =
+    officeSites.find((site) => site.id === selectedSiteId) ?? officeSites[0];
 
   return (
-    <WeatherWorkspaceContext.Provider value={value}>
+    <WeatherWorkspaceContext.Provider
+      value={{
+        selectedSiteId,
+        selectedSite,
+        temperatureUnit,
+        selectSite: () => undefined,
+        setTemperatureUnit: () => undefined,
+      }}
+    >
       {children}
     </WeatherWorkspaceContext.Provider>
   );
 }
 
 export function useWeatherWorkspace() {
-  // TODO 2: generare un errore esplicito quando manca il Provider.
-  const context = useContext(WeatherWorkspaceContext);
-  if (!context) {
-    throw new Error('useWeatherWorkspace richiede WeatherWorkspaceProvider.');
+  const value = useContext(WeatherWorkspaceContext);
+
+  if (!value) {
+    throw new Error(
+      'useWeatherWorkspace deve essere usato dentro WeatherWorkspaceProvider',
+    );
   }
-  return context;
+
+  return value;
 }
